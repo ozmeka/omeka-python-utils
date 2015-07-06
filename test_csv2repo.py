@@ -78,7 +78,14 @@ class TestFields(unittest.TestCase):
         self.assertEqual(f.type, None)
         self.assertEqual(f.namespace.name, None)
         self.assertEqual(f.field_name, None)
-    
+
+    def testRecurrence(self):
+        f = Field("dc:creator+")
+        self.assertEqual(f.type, Field.TEXT)
+        self.assertEqual(f.namespace.prefix, "dcterms")
+        self.assertEqual(f.field_name, "creator")
+        self.assertTrue(f.repeats)
+
         
 if __name__ == '__main__':
     unittest.main()

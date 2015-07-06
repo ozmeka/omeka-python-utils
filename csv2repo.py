@@ -6,6 +6,7 @@ such as Fedora Commons 4,
 """
 
 import csv
+import copy
 
 class Namespace:
     """ Crude way of handling vocabs - ATM there is no checking involved
@@ -57,9 +58,16 @@ class Field:
         self.value = None
         self.item_type_field = "dcterms:type" #TODO add a method to change
         self.collection_field = "pcdm:Collection"
-        
+        self.repeats = False
+
+ 
+            
         if ":" in field_name:
             ns, name = field_name.split(":", 1)
+            #IF field name has a plus, then interpret the contents as multiple fields
+            if name.endswith("+"):
+                name = name[:-1]
+            self.repeats = True
             if ns == "FILE":
                 self.type = self.FILE
                 self.field_name = name
@@ -74,14 +82,17 @@ class Field:
                     self.qualified_name = ':'.join([self.namespace.prefix, self.field_name])
             else:
                 self.namespace = Namespace(ns)
+               
                 self.field_name = name
                 self.qualified_name = ':'.join([self.namespace.prefix, self.field_name])
                 if self.qualified_name == self.item_type_field:
                     self.type = self.ITEM_TYPE
+                    self.repeats = False
                 elif self.qualified_name == self.collection_field:
                     self.type = self.IN_COLLECTION
                 else:
                     self.type = self.TEXT
+                    
 
 
 class Item:
@@ -101,11 +112,11 @@ class Item:
             f.value = value
             if value:
                 if f.type == Field.URL:
-                    self.URLs.append(f)
+                    self._add_field(f, self.URLs)
                 elif f.type == Field.FILE:
-                    self.files.append(f)           
+                    self._add_field(f, self.files)
                 elif f.type == Field.RELATION:
-                    self.relations.append(f)
+                    self._add_field(f, self.relations)
                 elif f.type == Field.IN_COLLECTION: #TODO - allow multiples?
                     self.in_collection = value # Should be an id
                 elif f.type == Field.TEXT:
@@ -117,14 +128,24 @@ class Item:
                         self.title = value
                     elif f.qualified_name == "dcterms:identifier":
                         self.id = value
-                    
-                    self.text_fields.append(f)
+                   
+                    self._add_field(f, self.text_fields)
+                   
                 elif f.type == Field.ITEM_TYPE:
                     self.type = value
                     if value == "pcdm:Collection":
                         self.is_collection = True
                        
-                  
+   
+
+    def _add_field(self, field, array):
+        if field.repeats:
+            for v in field.value.split(","):
+                new_field = copy.deepcopy(field)
+                new_field.value = v.strip()
+                array.append(new_field)
+        else:
+            array.append(field)
         # etc
 
             
