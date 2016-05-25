@@ -71,7 +71,8 @@ class OmekaClient:
             return False 
         
     def addItemRelation(self, subject_id, property_id, object_id):
-        """Relate two items (for now has a check to make sure they aren't related in the same way already until that can be baked into the API"""
+        """Relate two items (for now has a check to make sure they aren't related in the
+           same way already until that can be baked into the API"""
         relation_data = {"subject_item_id": subject_id,
                          "object_item_id":  object_id,
                          "property_id": property_id}
@@ -93,22 +94,23 @@ class OmekaClient:
             types_data = json.loads(content)
             if types_data <> []:
                 self.types[name] = types_data[0]
-                return types_data[0]["id"]
-            elif create:
+                if "id" in self.types[name]:
+                    return self.types[name]["id"]
+        if create:
                 self.logger.info("Item type %s not found, attempting to make one" % name)
                 response, content = self.post('item_types',  json.dumps({"name": name}))
                 types_data = json.loads(content)
                 self.types[name] = types_data
-               
                 return types_data["id"]
-            else:
-                return None
+        else:
+            return None
             
     def getVocabularyId(self, name):
         """Find an the ID of an ItemRelations vocabulary using its prefix (eg dcterms)"""
         if not name in self.vocabs:
             response, content = self.get('item_relations_vocabularies', query={"namespace_prefix": name})
             res = json.loads(content)
+            #print res
             if res <> []:
                 self.vocabs[name]  = res[0]
             else:
@@ -212,11 +214,37 @@ class OmekaClient:
     def get_collection_id_by_dc_identifier(self, dcid, name=None, create=False, public=False):
         """Find an Omeka collection by name and cache the results. Does not deal with collections with the same title"""
         element_id = self.getElementId(self.dublinCoreID, "Identifier")
-        title_id = self.getElementId(self.dublinCoreID, "Title")  
+        title_id = self.getElementId(self.dublinCoreID, "Title")
         def get_identifier(collection):
             for t in collection['element_texts']:
                     if t['element']['id'] == element_id:
                         self.collections_by_dc_identifier[t['text']] =  collection
+                        
+        if self.collections_by_dc_identifier == {}:
+            response, content = self.get('collections')
+            collections_data = json.loads(content)
+            for collection in collections_data:
+                get_identifier(collection)
+                 
+        if not dcid in self.collections_by_dc_identifier and create:
+            if name == None:
+                name = dcid
+            element_text1 = {"html": False, "text": name} 
+            element_text1["element"] = {"id": title_id }
+
+            element_text2 = {"html": False, "text": dcid} 
+            element_text2["element"] = {"id": element_id}
+            
+            response, content = self.post('collections', json.dumps({"element_texts": [element_text1, element_text2], "public" : public}))
+            collection = json.loads(content)
+            get_identifier(collection)
+        
+        return self.collections_by_dc_identifier[dcid]["id"] if dcid in self.collections_by_dc_identifier else None
+
+    def get_identifier(collection):
+        for t in collection['element_texts']:
+                 if t['element']['id'] == element_id:
+                    self.collections_by_dc_identifier[t['text']] =  collection
                         
         if self.collections_by_dc_identifier == {}:
             response, content = self.get('collections')
@@ -254,8 +282,9 @@ class OmekaClient:
             response, content = self.get('items')
             items_data = json.loads(content)
             for item in items_data:
+                print ".",
                 get_identifier(item)
-                 
+                
        
         
         return self.item_ids_by_dc_identifier[dcid] if dcid in self.item_ids_by_dc_identifier else None
@@ -351,31 +380,43 @@ class OmekaClient:
         return mimetypes.guess_type(filename)[0] or 'application/octet-stream'
 
     def _request(self, method, resource, id=None, data=None, query=None, headers=None):
-        if resource == "search":
-            url = self._endpoint.replace("api","items/browse")
-        else:
-            url = self._endpoint + "/" + resource
-        if id is not None:
-            url += "/" + str(id)
-        if self._key is not None:
-            query["key"] = self._key
-        url += "?" + urllib.urlencode(query)
+        again = True
+        cont = []
+        while again:
+            again = False
+            if resource == "search":
+                url = self._endpoint.replace("api","items/browse")
+            else:
+                url = self._endpoint + "/" + resource
+            if id is not None:
+                url += "/" + str(id)
+            if self._key is not None:
+                query["key"] = self._key
+            url += "?" + urllib.urlencode(query)
 
-        resp, content = self._http.request(url, method, body=data, headers=headers)
-        
-        links = resp['link'] if 'link' in resp else ""
-        for link in links.split(", "):
-            l = link.split("; ")
-            if l[-1] == 'rel="next"':
-                pages = re.findall(r'\Wpage=(\d+)', l[0])
-                per_pages = re.findall(r'\Wper_page=(\d+)', l[0])
-                page = int(pages[0]) if len(pages) > 0 else None
-                per_page = int(per_pages[0]) if len(per_pages) > 0 else None
+            resp, content = self._http.request(url, method, body=data, headers=headers)
+            try:
+                dat =  json.loads(content)
+            except:
+                dat = []
+           
+            cont = dat if isinstance(dat, dict) else cont + dat
+           
+            links = resp['link'] if 'link' in resp else  ""
+            
+            for link in links.split(", "):
+                l = link.split("; ")
+                if l[-1] == 'rel="next"':
+                    pages = re.findall(r'\Wpage=(\d+)', l[0])
+                    per_pages = re.findall(r'\Wper_page=(\d+)', l[0])
+                    page = int(pages[0]) if len(pages) > 0 else None
+                    per_page = int(per_pages[0]) if len(per_pages) > 0 else None
 
-                if page and per_page:
-                    query['page'] = page
-                    query['per_page'] = per_page
-                    resp, cont = self._request(method, resource, id, data, query, headers)
-                    content = json.dumps(json.loads(content) + json.loads(cont))
+                    if page and per_page:
+                        query['page'] = page
+                        query['per_page'] = per_page
+                        again = True
+                        
         #Returns strings - this is not ideal but to fix would require a breaking change
-        return resp, content
+        #TODO - fix this by making this thing return repository items rather than strings
+        return resp, json.dumps(cont)

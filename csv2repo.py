@@ -7,6 +7,10 @@ such as Fedora Commons 4,
 
 import csv
 import copy
+from rdflib import Graph, Literal, BNode, Namespace, RDF, URIRef
+from rdflib.namespace import DC, FOAF
+
+
 
 class Namespace:
     """ Crude way of handling vocabs - ATM there is no checking involved
@@ -21,7 +25,7 @@ class Namespace:
         vocabs = {"dc": dc, "dcterms": dc, "foaf": foaf, "bibo": bibo, "custom": custom, "FRBDR": frbr}
         self.prefix = None
         self.name = None
-        self. URI = None
+        self.URI = None
         if prefix in vocabs.keys():
             self.prefix = vocabs[prefix]["prefix"]
             self.name = vocabs[prefix]["name"]
@@ -41,7 +45,8 @@ class CSVData:
     def get_items(self):
         """ Get a set of abstract repository items and collections from the rows in the CSV"""
         for row in self._reader:
-            item = Item(row)
+            item = Item()
+            item.load_data(row)
             if item.is_collection:
                 self.collections.append(item)
             else:
@@ -60,14 +65,13 @@ class Field:
         self.collection_field = "pcdm:Collection"
         self.repeats = False
 
- 
-            
         if ":" in field_name:
             ns, name = field_name.split(":", 1)
-            #IF field name has a plus, then interpret the contents as multiple fields
+            #If field name has a plus, then interpret the contents as multiple fields
+            #TODO: add a test
             if name.endswith("+"):
                 name = name[:-1]
-            self.repeats = True
+                self.repeats = True
             if ns == "FILE":
                 self.type = self.FILE
                 self.field_name = name
@@ -82,9 +86,9 @@ class Field:
                     self.qualified_name = ':'.join([self.namespace.prefix, self.field_name])
             else:
                 self.namespace = Namespace(ns)
-               
                 self.field_name = name
                 self.qualified_name = ':'.join([self.namespace.prefix, self.field_name])
+                
                 if self.qualified_name == self.item_type_field:
                     self.type = self.ITEM_TYPE
                     self.repeats = False
@@ -97,7 +101,7 @@ class Field:
 
 class Item:
     """Repository item to be uploaded"""
-    def __init__(self, row = {}):
+    def __init__(self):
         self.files = []
         self.URLs = []
         self.relations = []
@@ -105,8 +109,12 @@ class Item:
         self.is_collection = False
         self.in_collection = None
         self.type = None
-        self.dc_id = None
-        self.dc_title = None
+        #self.dc_id = None
+        self.id = None
+        self.title = None
+        self.graph = Graph()
+        
+    def load_data(self, row):
         for key, value in row.items():
             f = Field(key)
             f.value = value
@@ -122,20 +130,25 @@ class Item:
                 elif f.type == Field.TEXT:
                     # Some fields are special, want these to bubble up as
                     # properties of the Item
-                    #TODO - maybe make what's special configurable but
+                    # TODO - maybe make what's special configurable but
                     # these are good defaults
                     if f.qualified_name == "dcterms:title":
                         self.title = value
                     elif f.qualified_name == "dcterms:identifier":
                         self.id = value
-                   
+
                     self._add_field(f, self.text_fields)
-                   
+
                 elif f.type == Field.ITEM_TYPE:
                     self.type = value
                     if value == "pcdm:Collection":
                         self.is_collection = True
-                       
+
+
+        for f in self.text_fields:
+           self.graph.add((Literal("<>"), URIRef(f.qualified_name), Literal(f.value)))
+       
+                  
    
 
     def _add_field(self, field, array):
@@ -146,7 +159,10 @@ class Item:
                 array.append(new_field)
         else:
             array.append(field)
-        # etc
+   
 
             
-        
+    def serialize_RDF(self):
+        # I don't understand how to get "<>" like Fedora wants
+        # so HACK!  
+        return self.graph.serialize(format="n3").replace('"<>"','<>')

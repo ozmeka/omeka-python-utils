@@ -8,16 +8,21 @@ the script is to allow a tecnically adept person to load data into an
 Omeka instance to create an initial repository. It is unlikely that
 you would want to maintain a repository using a CSV, the
 assumption is that this would be used to 'seed' a repository which
-would then be maintained using the normal web UI.
+would then be maintained using the normal web UI. It is also useful
+for testing.
 
 The file can contain:
 
 * Repository items, one per row.
-* Files 
+* Files from the file system, or available via URL
+* Omeka items as well as collections.
 * Multi-valued fields that get turned into multiple metadata elements
-  in Omeka, eg a comma separated list of contributors in a
+  in Omeka, eg a quoted, comma separated list of contributors in a
   dc:contributor column.
 
+The file can be sparsely populated - that is, you can add columns for
+lots of different kinds of metadata for different kinds of items and
+populate as needed.
 
 # Quick start
 
@@ -89,10 +94,11 @@ To structure your CSV file, using a spreadsheet program:
 *   Make sure there is an `dc:identifier` column containing an ID which
     is unique to the whole workbook (tip: you can use sequential
     integers using auto-fill in a spreadsheet program but make sure
-    not to reuse)
-  * Make sure there is a column "dc:type" with the name of an existing
-    Item Type for every data row (tip: use -y flag to force item types
-    to be auto-created). To make a collection enter pcdm:collection 
+    not to reuse). All items and collections **must** have a dc:identifier.
+  * Make sure there is a column `dc:type` with the name of an existing
+    Omeka Item Type for every data row (tip: use -y flag to force item types
+    to be auto-created). To make a collection enter the magic string
+    `pcdm:Collection`. 
   * Make sure there are Omeka metadata elements for each bit of metadata you'd like to import corresponding to the column headers on the worksheet, the script will attempt to find an element match
 
 ## Configure file uploads and item-relations

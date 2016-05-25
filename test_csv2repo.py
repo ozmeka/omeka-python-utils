@@ -1,5 +1,9 @@
 import unittest
 from csv2repo import CSVData, Field, Item, Namespace
+from rdflib import Graph, Literal, BNode, Namespace, RDF, URIRef
+from rdflib.namespace import DC, FOAF
+
+g = Graph()
 
 class TestNS(unittest.TestCase):
     def test_ns(self):
@@ -40,6 +44,9 @@ class TestCSVData(unittest.TestCase):
         self.assertEqual(c.items[2].in_collection, "texts")
         self.assertEqual(len(c.collections), 1)
 
+        # Can serialise an item as RDF
+        self.assertEqual(c.items[1].getRDF(), "")
+        
 class TestFields(unittest.TestCase):
     def test_file(self):
         f = Field("FILE:1")
