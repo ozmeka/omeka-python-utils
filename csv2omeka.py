@@ -3,8 +3,6 @@ from omekautils import get_omeka_config
 from omekautils import create_stream_logger
 from sys import stdout, stdin
 import argparse
-from csv2repo import CSVData
-import csv2repo
 import json
 import httplib2
 import urlparse
@@ -13,7 +11,8 @@ import json
 import csv
 import shelve
 import copy
-
+from pcdmlite.pcdmlite import Item 
+from csv2pcdmlite.csv2pcdmlite import CSVData 
 
 
 """ Uploads a csv file to an Omeka server as a series of items and/or collections, one per line """
@@ -128,10 +127,11 @@ parser.add_argument('-i', '--item_type', default="Text", help='Item type to us i
 parser.add_argument('-n', '--in_collection', default="None", help='Collection to use if there is no dc:type in the input row (Defaults to None).')
 args = vars(parser.parse_args())
 
-#config = get_omeka_config()
+if not args['api_url'] or not args['key']:
+    config = get_omeka_config()
 
 endpoint = args['api_url'] if args['api_url']  else config['api_url']
-apikey   = args['key'] if args['api_url'] <> None else config['key']
+apikey   = args['key'] if args['api_url'] else config['key']
 
 
 omeka_client = OmekaClient(endpoint.encode("utf-8"), logger, apikey)
