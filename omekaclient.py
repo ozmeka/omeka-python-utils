@@ -110,7 +110,6 @@ class OmekaClient:
         if not name in self.vocabs:
             response, content = self.get('item_relations_vocabularies', query={"namespace_prefix": name})
             res = json.loads(content)
-            #print res
             if res <> []:
                 self.vocabs[name]  = res[0]
             else:
@@ -126,6 +125,7 @@ class OmekaClient:
             if not label in  self.relation_properties[vocab_id]:
                 response, content = self.get('item_relations_properties', query={"label": label, "vocabulary_id": vocab_id})
                 res = json.loads(content)
+                print res
                 if res <> []:
                     self.relation_properties[vocab_id][label]  = res[0]
                 else:
